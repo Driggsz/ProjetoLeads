@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import numpy as np
 
 # Carregar os dados
 leads_data = pd.read_csv('TabelaPesquisaUTMsn.csv')
