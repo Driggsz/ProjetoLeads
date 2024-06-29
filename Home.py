@@ -56,6 +56,29 @@ st.dataframe(persona_data)
 st.write("## Dados dos Anúncios")
 st.dataframe(ads_data)
 
+
+# Análise dos Anúncios mais Repetidos na UTM Term
+utm_term_count = leads_data['utmterm'].value_counts().reset_index()
+utm_term_count.columns = ['UTM Term', 'Frequency']
+utm_term_count = utm_term_count.merge(ads_data[['utmterm', 'instagram_permalink_url']], left_on='UTM Term', right_on='utmterm', how='left')
+utm_term_count.drop(columns='utmterm', inplace=True)
+utm_term_count.columns = ['UTM Term', 'Frequency', 'Instagram Link']
+top_utm_terms = utm_term_count.head(10)
+
+st.write("## Anúncios mais Repetidos na UTM Term")
+st.dataframe(top_utm_terms)
+
+# Gráfico dos Anúncios mais Repetidos na UTM Term
+fig = px.bar(top_utm_terms, x='UTM Term', y='Frequency', title='Anúncios mais Repetidos na UTM Term', text='Frequency')
+st.plotly_chart(fig)
+
+# Explicação
+st.write("""
+### Análise dos Anúncios mais Repetidos na UTM Term
+Nesta análise, identificamos os anúncios mais frequentes na coluna `utmterm` e associamos cada um deles aos links correspondentes do Instagram. Esses dados são fundamentais para entender quais criativos estão gerando maior engajamento e tráfego para a campanha.
+Os termos sem links (`barriga-negativa`, `[BIO]`, e `[STORIES]`) indicam fontes de tráfego específicas e são autoexplicativos. `barriga-negativa` provavelmente se refere a um conceito ou tema específico, enquanto `[BIO]` e `[STORIES]` indicam tráfego vindo diretamente da bio de um perfil e dos stories do Instagram, respectivamente.
+""")
+
 # Análise da Taxa de Conversão por Canal de Origem
 conversion_by_source = leads_data.merge(sales_data, on='email', how='left', indicator=True)
 conversion_by_source['is_buyer'] = (conversion_by_source['_merge'] == 'both').astype(int)
@@ -107,30 +130,12 @@ st.plotly_chart(fig)
 st.write("### Explicação")
 st.write("O gráfico acima mostra a taxa de conversão para diferentes perfis de persona. Analisamos a idade, renda e quanto tempo o lead conhece o expert para identificar quais grupos têm maior probabilidade de se converter em compradores.")
 
-# Análise dos Insights da Pesquisa de Persona
-persona_insights = persona_data.merge(sales_data, on='email', how='left', indicator=True)
-persona_insights['is_buyer'] = (persona_insights['_merge'] == 'both').astype(int)
-persona_insights_grouped = persona_insights.groupby(['idade', 'renda', 'tempo_me_conhece'])['is_buyer'].agg(['mean', 'count']).reset_index()
-persona_insights_grouped.columns = ['Age', 'Income', 'Time Knowing Expert', 'Conversion Rate', 'Total Leads']
-
-# Destacar os insights mais relevantes
-top_insights = persona_insights_grouped.sort_values(by='Conversion Rate', ascending=False).head(10)
-
-st.write("## Insights da Pesquisa de Persona")
-st.dataframe(top_insights)
-
-# Gráfico dos Insights da Pesquisa de Persona
-fig = px.bar(top_insights, x='Age', y='Conversion Rate', color='Income', barmode='group', title='Insights da Pesquisa de Persona', text='Conversion Rate')
-st.plotly_chart(fig)
-st.write("### Explicação")
-st.write("O gráfico acima mostra insights detalhados da pesquisa de persona. Analisamos a idade, renda e quanto tempo o lead conhece o expert para identificar características que diferenciam os compradores dos não compradores.")
-
 # Análise de Criativos (UTM Term) e Públicos (UTM Medium)
 utm_analysis = leads_data.merge(sales_data, on='email', how='left', indicator=True)
 utm_analysis['is_buyer'] = (utm_analysis['_merge'] == 'both').astype(int)
 
-utm_term_analysis = utm_analysis.groupby('utmterm')['is_buyer'].mean().reset_index().sort_values(by='is_buyer', ascending=False)
-utm_medium_analysis = utm_analysis.groupby('utmmedium')['is_buyer'].mean().reset_index().sort_values(by='is_buyer', ascending=False)
+utm_term_analysis = utm_analysis.groupby('utmterm')['is_buyer'].mean().reset_index().sort_values(by='is_buyer', ascending=False).head(10)
+utm_medium_analysis = utm_analysis.groupby('utmmedium')['is_buyer'].mean().reset_index().sort_values(by='is_buyer', ascending=False).head(10)
 
 utm_term_analysis.columns = ['Creative (UTM Term)', 'Conversion Rate']
 utm_medium_analysis.columns = ['Public (UTM Medium)', 'Conversion Rate']
@@ -148,6 +153,7 @@ st.dataframe(utm_medium_analysis)
 
 fig = px.bar(utm_medium_analysis, x='Public (UTM Medium)', y='Conversion Rate', title='Taxa de Conversão por Público (UTM Medium)', text='Conversion Rate')
 st.plotly_chart(fig)
+
 st.write("### Explicação")
 st.write("O gráfico acima mostra a taxa de conversão para cada público (UTM Medium). Isso ajuda a entender quais públicos-alvo têm maior probabilidade de conversão e como otimizar campanhas futuras para esses segmentos.")
 
@@ -157,7 +163,6 @@ st.write("O gráfico acima mostra a taxa de conversão para cada público (UTM M
 conversion_rate_by_source.to_csv('conversion_rate_by_source.csv', index=False)
 conversion_rate_by_utm.to_csv('conversion_rate_by_utm.csv', index=False)
 conversion_rate_by_persona.to_csv('conversion_rate_by_persona.csv', index=False)
-persona_insights_grouped.to_csv('persona_insights_grouped.csv', index=False)
 utm_term_analysis.to_csv('utm_term_analysis.csv', index=False)
 utm_medium_analysis.to_csv('utm_medium_analysis.csv', index=False)
 if 'data' in leads_data.columns and pd.api.types.is_datetime64_any_dtype(leads_data['data']):
@@ -168,34 +173,47 @@ st.header('Explicação do Código')
 
 st.subheader('Carregamento e Pré-processamento dos Dados:')
 st.markdown("""
-Utilizamos a biblioteca pandas para carregar os dados de quatro tabelas principais: leads_data, sales_data, persona_data e ads_data que contêm informações sobre leads inscritos, compradores, pesquisa de persona e anúncios, respectivamente.
+Utilizamos a biblioteca pandas para carregar os dados de quatro tabelas principais: leads_data, sales_data, persona_data e ads_data (Essas respectivas tabelas são os CSV's: TabelaPesquisaUTMsn, TabelaVendas, TabelaPesquisa e TabelaAdsLinks) que contêm informações sobre leads inscritos, compradores, pesquisa de persona e anúncios, respectivamente.
 Renomeamos as colunas 'Unnamed' para 'id' e 'id2' para melhorar a clareza dos dados e, em seguida, removemos a coluna 'id2' se existir.
 """)
 
-st.subheader('Análise da Taxa de Conversão por Canal de Origem:')
-st.markdown("""
-Calculamos a taxa de conversão por canal de origem, juntando os dados de leads_data e sales_data usando a função merge.
-Criamos uma nova coluna is_buyer para indicar se um lead se converteu em comprador (1 para sim, 0 para não).
-Agrupamos os dados pelo campo 'utmsource' e calculamos a média de is_buyer para obter a taxa de conversão por canal de origem.
+st.write("""
+## Análise da Taxa de Conversão
+
+A taxa de conversão em todos os casos foi calculada através de uma abordagem similar, mas aplicada a diferentes grupos ou parâmetros. A seguir, detalho cada passo que foi utilizado no código para calcular a taxa de conversão:
+
+### 1. Taxa de Conversão por Canal de Origem
+
+Para calcular a taxa de conversão por canal de origem, seguimos os seguintes passos:
+- Juntamos os dados de leads (leads_data) com os dados de compradores (sales_data) com base no campo email.
+- Criamos uma nova coluna `is_buyer` para indicar se o lead se converteu em comprador (1 para sim, 0 para não).
+- Agrupamos os dados pelo campo `utmsource` (canal de origem) e calculamos a média de `is_buyer` para obter a taxa de conversão por canal de origem.
+
+### 2. Taxa de Conversão por Parâmetro UTM
+
+Para calcular a taxa de conversão por parâmetro UTM, seguimos os seguintes passos:
+- Juntamos os dados de leads (leads_data) com os dados de compradores (sales_data) com base no campo email.
+- Criamos uma nova coluna `is_buyer` para indicar se o lead se converteu em comprador (1 para sim, 0 para não).
+- Agrupamos os dados pelos campos `utmsource`, `utmmedium` e `utmterm` e calculamos a média de `is_buyer` para obter a taxa de conversão por parâmetro UTM.
+
+### 3. Taxa de Conversão por Perfil de Persona
+
+Para calcular a taxa de conversão por perfil de persona, seguimos os seguintes passos:
+- Juntamos os dados de persona (persona_data) com os dados de compradores (sales_data) com base no campo email.
+- Criamos uma nova coluna `is_buyer` para indicar se o lead se converteu em comprador (1 para sim, 0 para não).
+- Agrupamos os dados pelos campos `idade`, `renda` e `tempo_me_conhece` e calculamos a média de `is_buyer` para obter a taxa de conversão por perfil de persona.
+
+### 5. Análise de Criativos (UTM Term) e Públicos (UTM Medium)
+
+Para analisar a taxa de conversão por criativos (UTM Term) e públicos (UTM Medium), seguimos os seguintes passos:
+- Juntamos os dados de leads (leads_data) com os dados de compradores (sales_data) com base no campo email.
+- Criamos uma nova coluna `is_buyer` para indicar se o lead se converteu em comprador (1 para sim, 0 para não).
+- Agrupamos os dados pelos campos `utmterm` e `utmmedium` e calculamos a média de `is_buyer` para cada um deles.
+
+Em resumo, a taxa de conversão foi calculada como a média da coluna `is_buyer` após agrupar os dados pelos diferentes parâmetros de interesse (como `utmsource`, `utmmedium`, `utmterm`, `idade`, `renda`, e `tempo_me_conhece`). Essa abordagem permitiu determinar a eficácia de diferentes canais, campanhas, e perfis de persona em converter leads em compradores.
 """)
 
-st.subheader('Análise da Taxa de Conversão por Parâmetro UTM:')
-st.markdown("""
-Similar à análise por canal de origem, calculamos a taxa de conversão para diferentes combinações de parâmetros UTM (utmsource, utmmedium e utmterm).
-Agrupamos os dados por esses parâmetros e calculamos a média de is_buyer para cada combinação.
-""")
 
-st.subheader('Análise da Taxa de Conversão por Perfil de Persona:')
-st.markdown("""
-Utilizamos os dados da pesquisa de persona (persona_data) para analisar a taxa de conversão com base em características demográficas como idade, renda e tempo que conhecem o expert.
-Novamente, calculamos a média de is_buyer para cada grupo demográfico.
-""")
-
-st.subheader('Análise dos Insights da Pesquisa de Persona:')
-st.markdown("""
-Combinamos os dados da pesquisa de persona com os dados de compradores para obter insights detalhados sobre as características que diferenciam os compradores dos não compradores.
-Calculamos a média e o total de leads para cada combinação de características demográficas.
-""")
 
 st.subheader('Análise de Criativos (UTM Term) e Públicos (UTM Medium):')
 st.markdown("""
@@ -209,8 +227,7 @@ Utilizamos a biblioteca plotly.express para criar gráficos interativos (barras,
 Cada gráfico é acompanhado por uma explicação que destaca os principais pontos observados e como essas informações podem ser úteis para ajustar estratégias futuras.
 """)
 
-st.subheader('Análise da Taxa de Conversão ao Longo do Tempo:')
-st.markdown("""
-Caso os dados tenham uma dimensão temporal, podemos analisar a taxa de conversão ao longo do tempo. Isso permite identificar tendências e padrões sazonais na conversão de leads em compradores.
-Agrupamos os dados pela coluna temporal (data) e calculamos a média de is_buyer para cada data.
-""")
+
+
+
+
